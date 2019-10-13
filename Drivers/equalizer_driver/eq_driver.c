@@ -183,12 +183,11 @@ static ssize_t eq_write(struct file *f, const char __user *buf, size_t count, lo
 	if(lp[0]=='0' && lp[1]=='x')
 	{
 		lp=lp+2;
-		x = strToInt(lp, strlen(lp), 10);
+		x = strToInt(lp, strlen(lp), 16);
 	}
 	else
 		x = strToInt(lp, strlen(lp), 10);
 
-	//extract rgb(red,green,blue) value of pixel 
 	lp = rp;
 	if(!lp)
 	{
@@ -198,7 +197,7 @@ static ssize_t eq_write(struct file *f, const char __user *buf, size_t count, lo
 	if(lp[0]=='0' && lp[1]=='x')
 	{
 		lp=lp+2;
-		eq_paramater = strToInt(lp, strlen(lp), 10);
+		eq_paramater = strToInt(lp, strlen(lp), 16);
 	}
 	else
 		eq_paramater = strToInt(lp, strlen(lp), 10);

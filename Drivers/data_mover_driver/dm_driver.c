@@ -1,5 +1,3 @@
-// Copyright [2018] <nikola>
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
@@ -26,9 +24,9 @@
 
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Driver for VGA ouvput");
-#define DEVICE_NAME "vga"
-#define DRIVER_NAME "vga_dma_driver"
+MODULE_DESCRIPTION("Driver for DataMover output");
+#define DEVICE_NAME "dm"
+#define DRIVER_NAME "dm_driver"
 #define MAX_PKT_LEN 1024*4
 //*************************************************************************
 static int dm_probe(struct platform_device *pdev);
@@ -42,7 +40,7 @@ static void __exit dm_exit(void);
 static int dm_remove(struct platform_device *pdev);
 
 static irqreturn_t dm_isr(int irq,void*dev_id);
-int data_mover_init(void __iomem *base_address);
+int data_mover_init(void __iomem *base_address); //INIT FOR READ
 u32 dm_simple_write(dma_addr_t TxBufferPtr, u32 max_pkt_len, void __iomem *base_address); // helper function, defined later
 
 static char chToUpper(char ch);
@@ -58,12 +56,12 @@ static struct file_operations dm_fops = {
   .mmap = dm_mmap
 };
 static struct of_device_id dm_of_match[] = {
-  { .compatible = "xlnx,axi-dma-mm2s-vga-channel", },
-  {.compatible = "xlnx,axi-dma-vga-1.00.a"},
+  { .compatible = "xlnx,data_helper_1", }, // za upis mm2s
+  //{.compatible = "xlnx,data_helper_0 "}, // za citanje s2mm
   { /* end of list */ },
 };
 
-static struct platform_driver vga_dma_driver = {
+static struct platform_driver dm_driver = {
   .driver = {
     .name = DRIVER_NAME,
     .owner = THIS_MODULE,
@@ -73,7 +71,7 @@ static struct platform_driver vga_dma_driver = {
   .remove = dm_remove,
 };
 
-struct vga_dma_info {
+struct dm_info {
   unsigned long mem_start;
   unsigned long mem_end;
   void __iomem *base_addr;
@@ -81,7 +79,7 @@ struct vga_dma_info {
   
 };
 
-static struct vga_dma_info *vp = NULL;
+static struct dm_info *vp = NULL;
 
 MODULE_DEVICE_TABLE(of, dm_of_match);
 
@@ -90,7 +88,7 @@ static dev_t first;
 static struct class *cl;
 static int int_cnt;
 
-dma_addr_t tx_phy_buffer;
+dma_addr_t tx_phy_buffer; // dma_addr_t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 u32 *tx_vir_buffer;
 //***************************************************
 // PROBE AND REMOVE
@@ -108,9 +106,9 @@ static int dm_probe(struct platform_device *pdev) {
   }
   else
     printk(KERN_INFO "platform get resource success\n");
-  vp = (struct vga_dma_info *) kmalloc(sizeof(struct vga_dma_info), GFP_KERNEL);
+  vp = (struct dm_info *) kmalloc(sizeof(struct dm_info), GFP_KERNEL);
   if (!vp) {
-    printk(KERN_ALERT "Cound not allocate vga device\n");
+    printk(KERN_ALERT "Cound not allocate data_mover device\n");
     return -ENOMEM;
   }
   else
@@ -150,7 +148,7 @@ static int dm_probe(struct platform_device *pdev) {
   printk("irq number is: %d\n", vp->irq_num);
   
   if (request_irq(vp->irq_num, dm_isr, 0, DEVICE_NAME, NULL)) {
-    printk(KERN_ERR "vga_dmai_init: Cannot register IRQ %d\n", vp->irq_num);
+    printk(KERN_ERR "dm_init: Cannot register IRQ %d\n", vp->irq_num);
     return -EIO;
   }
   else {
@@ -187,97 +185,23 @@ static int dm_remove(struct platform_device *pdev)
 
 static int dm_open(struct inode *i, struct file *f)
 {
-  //printk("vga opened\n");
+  //printk("dm opened\n");
   return 0;
 }
 static int dm_close(struct inode *i, struct file *f)
 {
-  //printk("vga closed\n");
+  //printk("dm closed\n");
   return 0;
 }
 static ssize_t dm_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
-  //printk("vga read\n");
+  //printk("dm read\n");
   return 0;
 }
 static ssize_t dm_write(struct file *f, const char __user *buf, size_t count, loff_t *off) // IZ buf IZVLACI PODATKE O xpos, ypos i rgb, buf se jedino pojavljuje u funkcijama read i write
 {
-	
-  char buffer[count];
-  char *lp='\0';
-  char *rp='\0';
-  int i = 0;
-  unsigned int xpos=0,ypos=0,rgb=0;
-  i = copy_from_user(buffer, buf, count);
-  buffer[count - 1] = '\0';
-
-  //extract position on x axis 
-  lp = buffer;
-  rp = strchr(lp,',');
-  if(!rp)
-  {
-    printk("Invalid input, expected format: xpos,ypos,rgb\n");
-    return count;
-  }
-  *rp = '\0';
-  rp++;
-
-  if(lp[0]=='0' && lp[1]=='x')
-  {
-    lp=lp+2;
-    xpos = strToInt(lp, strlen(lp), 16);
-  }
-  else
-    xpos = strToInt(lp, strlen(lp), 10);
-
-  //extract position on y axis 
-  lp = rp;
-  rp = strchr(lp,',');
-  if(!rp)
-  {
-    printk("Invalid input, expected format: xpos,ypos,rgb\n");
-    return count;
-  }
-  *rp = '\0';
-  rp++;
-
-  if(lp[0]=='0' && lp[1]=='x')
-  {
-    lp=lp+2;
-    ypos = strToInt(lp, strlen(lp), 16);
-  }
-  else
-    ypos = strToInt(lp, strlen(lp), 10);
-
-  //extract rgb(red,green,blue) value of pixel 
-  lp = rp;
-  if(!lp)
-  {
-    printk("Invalid input, expected format: xpos,ypos,rgb\n");
-    return count;
-  }
-  if(lp[0]=='0' && lp[1]=='x')
-  {
-    lp=lp+2;
-    rgb = strToInt(lp, strlen(lp), 16);
-  }
-  else
-    rgb = strToInt(lp, strlen(lp), 10);
-
-	
-  if (xpos>=640 || ypos>=480)
-  {
-    printk("position of pixel is out of bounds\n");
-    return count;
-  }
-
-
-  tx_vir_buffer[640*ypos + xpos] = (u32)rgb; //OVDE UPISUJEMO NASE PODATKE U VIRUELNI BAFER 
-
-
-  //printk("Sucessfull write \n");
-  return count;
-
+	//printk("dm write\n");
+  return 0;
 }
 
 static ssize_t dm_mmap(struct file *f, struct vm_area_struct *vma_s) // OVDE VIRTUELNI PODATCI U PRAVE PODATKE, mozemo ostaviti "istu"
@@ -406,7 +330,7 @@ static int __init dm_init(void)
 
   printk(KERN_INFO "dm_init: Initialize Module \"%s\"\n", DEVICE_NAME);
 
-  if (alloc_chrdev_region(&first, 0, 1, "VGA_DMA_region") < 0)
+  if (alloc_chrdev_region(&first, 0, 1, "DM_region") < 0)
   {
     printk(KERN_ALERT "<1>Failed CHRDEV!.\n");
     return -1;
@@ -419,7 +343,7 @@ static int __init dm_init(void)
     goto fail_0;
   }
   printk(KERN_INFO "Succ class chardev1 create!.\n");
-  if (device_create(cl, NULL, MKDEV(MAJOR(first),0), NULL, "vga_dma") == NULL)
+  if (device_create(cl, NULL, MKDEV(MAJOR(first),0), NULL, "dm") == NULL)
   {
     goto fail_1;
   }
@@ -445,7 +369,7 @@ static int __init dm_init(void)
   for (i = 0; i < MAX_PKT_LEN/4;i++)
     tx_vir_buffer[i] = 0x00000000;
   printk(KERN_INFO "DMA memory reset.\n");
-  return platform_driver_register(&vga_dma_driver);
+  return platform_driver_register(&dm_driver);
  fail_3:
   cdev_del(&c_dev);
  fail_2:
@@ -461,7 +385,7 @@ static int __init dm_init(void)
 static void __exit dm_exit(void)  		
 {
   
-  platform_driver_unregister(&vga_dma_driver);
+  platform_driver_unregister(&dm_driver);
   cdev_del(&c_dev);
   device_destroy(cl, MKDEV(MAJOR(first),0));
   class_destroy(cl);
@@ -474,6 +398,6 @@ module_init(dm_init);
 module_exit(dm_exit);
 
 MODULE_AUTHOR ("FTN");
-MODULE_DESCRIPTION("Test Driver for VGA output.");
+MODULE_DESCRIPTION("Test Driver for DataMover output.");
 MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("custom:vga_dma");
+MODULE_ALIAS("custom:dm");
