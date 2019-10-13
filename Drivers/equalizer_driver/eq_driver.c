@@ -183,7 +183,7 @@ static ssize_t eq_write(struct file *f, const char __user *buf, size_t count, lo
 	if(lp[0]=='0' && lp[1]=='x')
 	{
 		lp=lp+2;
-		x = strToInt(lp, strlen(lp), 24);
+		x = strToInt(lp, strlen(lp), 10);
 	}
 	else
 		x = strToInt(lp, strlen(lp), 10);
@@ -198,17 +198,17 @@ static ssize_t eq_write(struct file *f, const char __user *buf, size_t count, lo
 	if(lp[0]=='0' && lp[1]=='x')
 	{
 		lp=lp+2;
-		eq_paramater = strToInt(lp, strlen(lp), 24);
+		eq_paramater = strToInt(lp, strlen(lp), 10);
 	}
 	else
 		eq_paramater = strToInt(lp, strlen(lp), 10);
 
 	
-	//if (x < 0 || x > 18) // ADDRESS
-	//{
-	//	printk("position of eq_paramater is out of bounds\n");
-	//	return count;
-	//}
+	if (x < 0 || x > 18) // ADDRESS
+	{
+		printk("position of eq_paramater is out of bounds\n");
+		return count;
+	}
 
 	printk("ADDR %d V %d \n",x,eq_paramater);
 
