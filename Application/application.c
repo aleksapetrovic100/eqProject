@@ -10,14 +10,15 @@
 int main(void)
 {
 	FILE* fp;
+    int i;
 
     for(i = 0; i < (NUMBER_OF_AMPLIFICATIONS+NUMBER_OF_BOUNDARIES); i++)
     {
-        fp = fopen("/dev/equalizer_IP", "w");
+        fp = fopen("/dev/eq", "w");
         if(fp == NULL)
         {
-            printf("Cannot open /dev/equalizer_IP for write\n");
-				return -1
+            printf("Cannot open /dev/eq for write\n");
+				return -1;
         }
         if(i < NUMBER_OF_AMPLIFICATIONS)
             fprintf(fp,"%d,%#08x\n",i,p[i]);
@@ -26,7 +27,7 @@ int main(void)
         fclose(fp);
 		if(fp == NULL)
 		{
-			printf("Cannot close /dev/equalizer_IP\n");
+			printf("Cannot close /dev/eq\n");
 			return -1;
 		}
     }

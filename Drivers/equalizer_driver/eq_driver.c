@@ -21,9 +21,9 @@
 #include <linux/uaccess.h>
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Driver for VGA ouvput");
-#define DEVICE_NAME "equalizer_IP"
-#define DRIVER_NAME "equalizer_IP_driver"
+MODULE_DESCRIPTION("Driver for equalizer output");
+#define DEVICE_NAME "eq"
+#define DRIVER_NAME "eq_driver"
 
 //*************************************************************************
 static int eq_probe(struct platform_device *pdev);
@@ -95,7 +95,7 @@ static int eq_probe(struct platform_device *pdev)
 	}
 	vp = (struct eq_info *) kmalloc(sizeof(struct eq_info), GFP_KERNEL);
 	if (!vp) {
-		printk(KERN_ALERT "Cound not allocate vga device\n");
+		printk(KERN_ALERT "Cound not allocate eq device\n");
 		return -ENOMEM;
 	}
 
@@ -144,17 +144,17 @@ static int eq_remove(struct platform_device *pdev)
 
 static int eq_open(struct inode *i, struct file *f)
 {
-	//printk("vga opened\n");
+	printk("eq opened\n");
 	return 0;
 }
 static int eq_close(struct inode *i, struct file *f)
 {
-	//printk("vga closed\n");
+	printk("eq closed\n");
 	return 0;
 }
 static ssize_t eq_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
-	//printk("vga read\n");
+	printk("eq read\n");
 	return 0;
 }
 static ssize_t eq_write(struct file *f, const char __user *buf, size_t count, loff_t *off)
@@ -164,7 +164,6 @@ static ssize_t eq_write(struct file *f, const char __user *buf, size_t count, lo
 	char *lp='\0';
 	char *rp='\0';
 	int i = 0;
-	//unsigned int xpos=0,ypos=0,rgb=0;
 	unsigned int x, eq_paramater;
 
     i = copy_from_user(buffer, buf, count);
@@ -184,10 +183,10 @@ static ssize_t eq_write(struct file *f, const char __user *buf, size_t count, lo
 	if(lp[0]=='0' && lp[1]=='x')
 	{
 		lp=lp+2;
-		x = strToInt(lp, strlen(lp), 32);
+		x = strToInt(lp, strlen(lp), 24);
 	}
 	else
-		x = strToInt(lp, strlen(lp), 32);
+		x = strToInt(lp, strlen(lp), 10);
 
 	//extract rgb(red,green,blue) value of pixel 
 	lp = rp;
@@ -199,17 +198,17 @@ static ssize_t eq_write(struct file *f, const char __user *buf, size_t count, lo
 	if(lp[0]=='0' && lp[1]=='x')
 	{
 		lp=lp+2;
-		eq_paramater = strToInt(lp, strlen(lp), 32);
+		eq_paramater = strToInt(lp, strlen(lp), 24);
 	}
 	else
-		eq_paramater = strToInt(lp, strlen(lp), 32);
+		eq_paramater = strToInt(lp, strlen(lp), 10);
 
 	
-	if (x < 0 || x > 19) // ADDRESS
-	{
-		printk("position of eq_paramater is out of bounds\n");
-		return count;
-	}
+	//if (x < 0 || x > 18) // ADDRESS
+	//{
+	//	printk("position of eq_paramater is out of bounds\n");
+	//	return count;
+	//}
 
 	printk("ADDR %d V %d \n",x,eq_paramater);
 
@@ -270,7 +269,7 @@ static int __init eq_init(void)
 
 	printk(KERN_INFO "eq_init: Initialize Module \"%s\"\n", DEVICE_NAME);
 
-	if (alloc_chrdev_region(&first, 0, 1, "VGA_region") < 0)
+	if (alloc_chrdev_region(&first, 0, 1, "eq_region") < 0)
 	{
 		printk(KERN_ALERT "<1>Failed CHRDEV!.\n");
 		return -1;
@@ -283,7 +282,7 @@ static int __init eq_init(void)
 		goto fail_0;
 	}
 	printk(KERN_INFO "Succ class chardev1 create!.\n");
-	if (device_create(cl, NULL, MKDEV(MAJOR(first),0), NULL, "vga") == NULL)
+	if (device_create(cl, NULL, MKDEV(MAJOR(first),0), NULL, "eq") == NULL)
 	{
 		goto fail_1;
 	}
@@ -325,6 +324,6 @@ module_init(eq_init);
 module_exit(eq_exit);
 
 MODULE_AUTHOR ("FTN");
-MODULE_DESCRIPTION("Test Driver for Equalizer output.");
+MODULE_DESCRIPTION("Test Driver for equalizer output.");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("custom:equalizer");
