@@ -195,9 +195,9 @@ static ssize_t dm_write(struct file *f, const char __user *buf, size_t count, lo
   if(count > 0)
   {
     if(buf[0] == 'w')
-      dm_simple_write;
+      dm_simple_write(tx_phy_buffer, MAX_PKT_LEN, vp->base_addr);
   }
-	printk("dm write\n");
+	printk("dm write commant sucessfull\n");
   return count;
 }
 
