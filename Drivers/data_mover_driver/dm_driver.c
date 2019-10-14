@@ -144,13 +144,13 @@ static int dm_probe(struct platform_device *pdev) {
   vp->irq_num = platform_get_irq(pdev, 0);
   printk("irq number is: %d\n", vp->irq_num);
   
-  if (request_irq(vp->irq_num, dm_isr, 0, DEVICE_NAME, NULL)) {
-    printk(KERN_ERR "dm_init: Cannot register IRQ %d\n", vp->irq_num);
-    return -EIO;
-  }
-  else {
-    printk(KERN_INFO "dm_init: Registered IRQ %d\n", vp->irq_num);
-  }
+  // if (request_irq(vp->irq_num, dm_isr, 0, DEVICE_NAME, NULL)) {
+  //   printk(KERN_ERR "dm_init: Cannot register IRQ %d\n", vp->irq_num);
+  //   return -EIO;
+  // }
+  // else {
+  //   printk(KERN_INFO "dm_init: Registered IRQ %d\n", vp->irq_num);
+  // }
 
   printk("probing done");
 error2:
@@ -235,9 +235,9 @@ u32 dm_simple_write(dma_addr_t TxBufferPtr, u32 max_pkt_len, void __iomem *base_
   iowrite32((u32)DM_EN, base_address+2);
   //iowrite32((u32)0, base_address+2);
 
-  while(ioread32(base_address+3) & 1 == 0)
+  while(ioread32(base_address+3) & (u32)1 == 0)
   {
-    printk("Waiting Datamover to send command.... \n")
+    printk("Waiting Datamover to send command.... \n");
   }
   return 0;
 }
