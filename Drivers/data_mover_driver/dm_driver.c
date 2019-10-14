@@ -28,6 +28,8 @@ MODULE_DESCRIPTION("Driver for DataMover output");
 #define DEVICE_NAME "dm"
 #define DRIVER_NAME "dm_driver"
 #define MAX_PKT_LEN 1024*4
+#define DM_EN 1024
+
 //*************************************************************************
 static int dm_probe(struct platform_device *pdev);
 static int dm_open(struct inode *i, struct file *f);
@@ -39,12 +41,7 @@ static int __init dm_init(void);
 static void __exit dm_exit(void);
 static int dm_remove(struct platform_device *pdev);
 
-static irqreturn_t dm_isr(int irq,void*dev_id);
-int data_mover_init(void __iomem *base_address); //INIT FOR READ
 u32 dm_simple_write(dma_addr_t TxBufferPtr, u32 max_pkt_len, void __iomem *base_address); // helper function, defined later
-
-static char chToUpper(char ch);
-static unsigned long strToInt(const char* pStr, int len, int base);
 
 // *********************GLOBAL VARIABLES*************************************
 static struct file_operations dm_fops = {
@@ -134,7 +131,7 @@ static int dm_probe(struct platform_device *pdev) {
 
   vp->base_addr = ioremap(vp->mem_start, vp->mem_end - vp->mem_start + 1);
   if (!vp->base_addr) {
-    printk(KERN_ALERT "vga: Could not allocate iomem\n");
+    printk(KERN_ALERT "dm: Could not allocate iomem\n");
     rc = -EIO;
     goto error2;
   }
@@ -154,12 +151,7 @@ static int dm_probe(struct platform_device *pdev) {
   else {
     printk(KERN_INFO "dm_init: Registered IRQ %d\n", vp->irq_num);
   }
-  
-  
-  /* INIT DMA */
-  data_mover_init(vp->base_addr);
-  dm_simple_write(tx_phy_buffer, MAX_PKT_LEN, vp->base_addr); // helper function, defined later
-  
+
   printk("probing done");
 error2:
   release_mem_region(vp->mem_start, vp->mem_end - vp->mem_start + 1);
@@ -172,8 +164,8 @@ static int dm_remove(struct platform_device *pdev)
 {
   // Exit Device Module
   u32 reset;
-  reset = 0x00000004;
-  iowrite32(reset, vp->base_addr); // writing to MM2S_DMACR register. Seting reset bit (3. bit)
+  reset = 0;
+  iowrite32(reset, vp->base_addr+2); // writing to MM2S_DMACR register. Seting reset bit (3. bit)
   iounmap(vp->base_addr);
   free_irq(vp->irq_num, NULL);
   //release_mem_region(vp->mem_start, vp->mem_end - vp->mem_start + 1);
@@ -185,30 +177,35 @@ static int dm_remove(struct platform_device *pdev)
 
 static int dm_open(struct inode *i, struct file *f)
 {
-  //printk("dm opened\n");
+  printk("dm opened\n");
   return 0;
 }
 static int dm_close(struct inode *i, struct file *f)
 {
-  //printk("dm closed\n");
+  printk("dm closed\n");
   return 0;
 }
 static ssize_t dm_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
-  //printk("dm read\n");
+  printk("dm read\n");
   return 0;
 }
-static ssize_t dm_write(struct file *f, const char __user *buf, size_t count, loff_t *off) // IZ buf IZVLACI PODATKE O xpos, ypos i rgb, buf se jedino pojavljuje u funkcijama read i write
+static ssize_t dm_write(struct file *f, const char __user *buf, size_t count, loff_t *off) 
 {
-	//printk("dm write\n");
-  return 0;
+  if(count > 0)
+  {
+    if(buf[0] == 'w')
+      dm_simple_write;
+  }
+	printk("dm write\n");
+  return count;
 }
 
-static ssize_t dm_mmap(struct file *f, struct vm_area_struct *vma_s) // OVDE VIRTUELNI PODATCI U PRAVE PODATKE, mozemo ostaviti "istu"
+static ssize_t dm_mmap(struct file *f, struct vm_area_struct *vma_s)
 {
 	int ret = 0;
 	long length = vma_s->vm_end - vma_s->vm_start;
-	//printk(KERN_INFO "DMA TX Buffer is being memory mapped\n");
+	printk(KERN_INFO "DMA TX Buffer is being memory mapped\n");
 
 	if(length > MAX_PKT_LEN)
 	{
@@ -225,100 +222,25 @@ static ssize_t dm_mmap(struct file *f, struct vm_area_struct *vma_s) // OVDE VIR
 	return 0;
 }
 
-/****************************************************/
-// IMPLEMENTATION OF DMA related functions
-
-static irqreturn_t dm_isr(int irq,void*dev_id)
-{
-  u32 IrqStatus;  
-  /* Read pending interrupts */
-  IrqStatus = ioread32(vp->base_addr + 4);//read irq status from MM2S_DMASR register
-  iowrite32(IrqStatus | 0x00007000, vp->base_addr + 4);//clear irq status in MM2S_DMASR register
-  //(clearing is done by writing 1 on 13. bit in MM2S_DMASR (IOC_Irq)
-
-  /*Send a transaction*/
-  dm_simple_write(tx_phy_buffer, MAX_PKT_LEN, vp->base_addr); //My function that starts a DMA transaction
-  return IRQ_HANDLED;;
-}
-
-int data_mover_init(void __iomem *base_address)
-{
-  u32 reset = 0x00000004;
-  u32 IOC_IRQ_EN; 
-  u32 ERR_IRQ_EN;
-  u32 MM2S_DMACR_reg;
-  u32 en_interrupt;
-    
-  IOC_IRQ_EN = 1 << 12; // this is IOC_IrqEn bit in MM2S_DMACR register
-  ERR_IRQ_EN = 1 << 14; // this is Err_IrqEn bit in MM2S_DMACR register
-
-  iowrite32(reset, base_address); // writing to MM2S_DMACR register. Seting reset bit (3. bit)
-  
-  MM2S_DMACR_reg = ioread32(base_address); // Reading from MM2S_DMACR register inside DMA
-  en_interrupt = MM2S_DMACR_reg | IOC_IRQ_EN | ERR_IRQ_EN;// seting 13. and 15.th bit in MM2S_DMACR
-  iowrite32(en_interrupt, base_address); // writing to MM2S_DMACR register  
-  return 0;
-}
-
 u32 dm_simple_write(dma_addr_t TxBufferPtr, u32 max_pkt_len, void __iomem *base_address) {
-  u32 MM2S_DMACR_reg;
+  
+  u32 SADDR = (u32)TxBufferPtr;
+  u32 BytesToTransfer = 4*max_pkt_len;
 
-  MM2S_DMACR_reg = ioread32(base_address); // READ from MM2S_DMACR register
+  printk("BytesToTransfer %d SADDR %d \n",BytesToTransfer,SADDR);
 
-  iowrite32(0x1 |  MM2S_DMACR_reg, base_address); // set RS bit in MM2S_DMACR register (this bit starts the DMA)
+  iowrite32(1<<30 | 1<<23 | 23 | BytesToTransfer, base_address);
+  iowrite32(SADDR, base_address+1);
+  //iowrite32((u32)0, base_address+2);
+  iowrite32((u32)DM_EN, base_address+2);
+  //iowrite32((u32)0, base_address+2);
 
-  iowrite32((u32)TxBufferPtr, base_address + 24); // Write into MM2S_SA register the value of TxBufferPtr.
-  // With this, the DMA knows from where to start.
-
-  iowrite32(max_pkt_len, base_address + 40); // Write into MM2S_LENGTH register. This is the length of a tranaction.
-  // In our case this is the size of the image (640*480*4)
+  while(ioread32(base_address+3) & 1 == 0)
+  {
+    printk("Waiting Datamover to send command.... \n")
+  }
   return 0;
 }
-
-
-
-//***************************************************
-// HELPER FUNCTIONS (STRING TO INTEGER)
-
-
-static char chToUpper(char ch)
-{
-  if((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))
-  {
-    return ch;
-  }
-  else
-  {
-    return ch - ('a'-'A');
-  }
-}
-
-static unsigned long strToInt(const char* pStr, int len, int base)
-{
-  //                      0,1,2,3,4,5,6,7,8,9,:,;,<,=,>,?,@,A ,B ,C ,D ,E ,F
-  static const int v[] = {0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0,0,10,11,12,13,14,15};
-  int i   = 0;
-  unsigned long val = 0;
-  int dec = 1;
-  int idx = 0;
-
-  for(i = len; i > 0; i--)
-  {
-    idx = chToUpper(pStr[i-1]) - '0';
-
-    if(idx > sizeof(v)/sizeof(int))
-    {
-      printk("strToInt: illegal character %c\n", pStr[i-1]);
-      continue;
-    }
-
-    val += (v[idx]) * dec;
-    dec *= base;
-  }
-
-  return val;
-}
-
 
 //***************************************************
 // INIT AND EXIT FUNCTIONS OF THE DRIVER
