@@ -7,24 +7,25 @@
 #include <fcntl.h>
 #include "coeficients.h"
 
+#define MAX_PKT_SIZE 1024*4
+
 int main(void)
 {
 	int fd;
 	int *p;
-	fd = open("/dev/dm", O_RDWR|O_NDELAY);
+	fd = open("/dev/dm_mm2s", O_RDWR|O_NDELAY);
 	if (fd < 0)
 	{
-		printf("Cannot open /dev/dm for write\n");
+		printf("Cannot open /dev/dm_mm2s for write\n");
 		return -1;
 	}
-	p=(int*)mmap(0,1024*4, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	memcpy(p, image, MAX_PKT_SIZE);
+	p=(int*)mmap(0,MAX_PKT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	memcpy(p, audio, MAX_PKT_SIZE);
 	munmap(p, MAX_PKT_SIZE);
-	fprintf(fp,"%c",'w');
 	close(fd);
 	if (fd < 0)
 	{
-		printf("Cannot close /dev/dm for write\n");
+		printf("Cannot close /dev/dm_mm2s for write\n");
 		return -1;
 	}
 	return 0;

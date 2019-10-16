@@ -1,7 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/interrupt.h>
-#include <linux/irq.h>
+//#include <linux/interrupt.h>
+//#include <linux/irq.h>
 #include <linux/platform_device.h>
 #include <asm/io.h>
 #include <linux/init.h>
@@ -25,7 +25,7 @@
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Driver for DataMover output");
-#define DEVICE_NAME "dm"
+#define DEVICE_NAME "dm_s2mm"
 #define DRIVER_NAME "dm_driver"
 #define MAX_PKT_LEN 1024*4
 #define DM_EN 1024
@@ -53,8 +53,7 @@ static struct file_operations dm_fops = {
   .mmap = dm_mmap
 };
 static struct of_device_id dm_of_match[] = {
-  { .compatible = "xlnx,data_helper_1", }, // za upis mm2s
-  //{.compatible = "xlnx,data_helper_0 "}, // za citanje s2mm
+  {.compatible = "xlnx,data_helper_0 "}, //  s2mm
   { /* end of list */ },
 };
 
@@ -72,7 +71,7 @@ struct dm_info {
   unsigned long mem_start;
   unsigned long mem_end;
   void __iomem *base_addr;
-  int irq_num;
+  //int irq_num;
   
 };
 
@@ -85,7 +84,7 @@ static dev_t first;
 static struct class *cl;
 static int int_cnt;
 
-dma_addr_t tx_phy_buffer; // dma_addr_t!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+dma_addr_t tx_phy_buffer; 
 u32 *tx_vir_buffer;
 //***************************************************
 // PROBE AND REMOVE
@@ -141,8 +140,8 @@ static int dm_probe(struct platform_device *pdev) {
   /* 
    * Geting irq num 
    */
-  vp->irq_num = platform_get_irq(pdev, 0);
-  printk("irq number is: %d\n", vp->irq_num);
+  // vp->irq_num = platform_get_irq(pdev, 0);
+  // printk("irq number is: %d\n", vp->irq_num);
   
   // if (request_irq(vp->irq_num, dm_isr, 0, DEVICE_NAME, NULL)) {
   //   printk(KERN_ERR "dm_init: Cannot register IRQ %d\n", vp->irq_num);
@@ -165,9 +164,9 @@ static int dm_remove(struct platform_device *pdev)
   // Exit Device Module
   u32 reset;
   reset = 0;
-  iowrite32(reset, vp->base_addr+2); // writing to MM2S_DMACR register. Seting reset bit (3. bit)
+  iowrite32(reset, vp->base_addr+2); // disabling datamover
   iounmap(vp->base_addr);
-  free_irq(vp->irq_num, NULL);
+  //free_irq(vp->irq_num, NULL);
   //release_mem_region(vp->mem_start, vp->mem_end - vp->mem_start + 1);
   return 0;
 }
@@ -192,13 +191,8 @@ static ssize_t dm_read(struct file *f, char __user *buf, size_t len, loff_t *off
 }
 static ssize_t dm_write(struct file *f, const char __user *buf, size_t count, loff_t *off) 
 {
-  if(count > 0)
-  {
-    if(buf[0] == 'w')
-      dm_simple_write(tx_phy_buffer, MAX_PKT_LEN, vp->base_addr);
-  }
-	printk("dm write commant sucessfull\n");
-  return count;
+  printk("dm write\n");
+  return 0;
 }
 
 static ssize_t dm_mmap(struct file *f, struct vm_area_struct *vma_s)
@@ -222,20 +216,20 @@ static ssize_t dm_mmap(struct file *f, struct vm_area_struct *vma_s)
 	return 0;
 }
 
-u32 dm_simple_write(dma_addr_t TxBufferPtr, u32 max_pkt_len, void __iomem *base_address) {
+u32 dm_simple_read(dma_addr_t TxBufferPtr, u32 max_pkt_len, void __iomem *base_address) {
   
-  u32 SADDR = (u32)TxBufferPtr;
+  u32 SADDR = (u32)TxBufferPtr; 
   u32 BytesToTransfer = 4*max_pkt_len;
 
   printk("BytesToTransfer %d SADDR %d \n",BytesToTransfer,SADDR);
 
-  iowrite32(1<<30 | 1<<23 | 23 | BytesToTransfer, base_address);
-  iowrite32(SADDR, base_address+1);
+  iowrite32(1<<30 | 1<<23 | 23 | BytesToTransfer, base_address); //SLANJE KOMANDE NA DATAMOVER HELPER KOJI KONTROLISE DATAMOVER
+  iowrite32(SADDR, base_address+1); 
   //iowrite32((u32)0, base_address+2);
   iowrite32((u32)DM_EN, base_address+2);
   //iowrite32((u32)0, base_address+2);
 
-  while(ioread32(base_address+3) & (u32)1 == 0)
+  while(ioread32(base_address+3) && (u32)1 == 0)
   {
     printk("Waiting Datamover to send command.... \n");
   }
@@ -265,7 +259,7 @@ static int __init dm_init(void)
     goto fail_0;
   }
   printk(KERN_INFO "Succ class chardev1 create!.\n");
-  if (device_create(cl, NULL, MKDEV(MAJOR(first),0), NULL, "dm") == NULL)
+  if (device_create(cl, NULL, MKDEV(MAJOR(first),0), NULL, "dm_s2mm") == NULL)
   {
     goto fail_1;
   }
@@ -322,4 +316,4 @@ module_exit(dm_exit);
 MODULE_AUTHOR ("FTN");
 MODULE_DESCRIPTION("Test Driver for DataMover output.");
 MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("custom:dm");
+MODULE_ALIAS("custom:dm_s2mm");
